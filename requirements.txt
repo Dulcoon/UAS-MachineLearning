@@ -18,7 +18,7 @@ htmlmin==0.1.12
 idna==3.7
 ImageHash==4.3.1
 Jinja2==3.1.4
-joblib==1.1.1
+joblib==1.2.0
 jsonschema==4.22.0
 jsonschema-specifications==2023.12.1
 kiwisolver==1.4.5
@@ -32,6 +32,7 @@ networkx==3.3
 numpy==1.26.4
 packaging==24.1
 pandas==2.2.2
+phik==0.12.4
 pillow==10.3.0
 protobuf==4.25.3
 pyarrow==16.1.0
