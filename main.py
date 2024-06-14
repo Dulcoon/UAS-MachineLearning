@@ -35,7 +35,7 @@ def preprocess_data(df, features):
     df_encoded = pd.get_dummies(df[features], drop_first=True)
     return df_encoded
 
-def train_and_evaluate(df, features, label, model_params):
+def train_and_evaluate(df, features, label, model_params, test_size):
     df = handle_missing_values(df, features)  # Handle missing values before preprocessing
     X = preprocess_data(df, features)
     
@@ -43,7 +43,7 @@ def train_and_evaluate(df, features, label, model_params):
     label_encoder = LabelEncoder()
     y = label_encoder.fit_transform(df[label])
     
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
 
     if model_params['model'] == 'KNN':
         model = KNeighborsClassifier(**model_params['params'])
@@ -71,14 +71,18 @@ def train_and_evaluate(df, features, label, model_params):
         except ValueError as e:
             st.warning(f"Could not calculate {metric_name}: {e}")
 
-    return results
+    return results, X_train, X_test, y_train, y_test
 
-def generate_pdf(results_knn, results_dt):
+def generate_pdf(results_knn, results_dt, params_knn, params_dt, X_train, X_test, y_train, y_test):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         pdf_path = tmp.name
         c = canvas.Canvas(pdf_path, pagesize=letter)
         c.setFont("Helvetica", 12)
+        
+        # Title
         c.drawString(30, 750, "Comparison of KNN and Decision Tree Models")
+        
+        # Metrics
         c.drawString(30, 735, "Metrics")
         c.drawString(150, 735, "KNN")
         c.drawString(250, 735, "Decision Tree")
@@ -89,6 +93,33 @@ def generate_pdf(results_knn, results_dt):
             c.drawString(150, y_position, str(round(results_knn[metric], 4)))
             c.drawString(250, y_position, str(round(results_dt[metric], 4)))
             y_position -= 15
+        
+        # Parameters
+        y_position -= 20
+        c.drawString(30, y_position, "KNN Parameters:")
+        y_position -= 15
+        for param, value in params_knn['params'].items():
+            c.drawString(30, y_position, f"{param}: {value}")
+            y_position -= 15
+        
+        y_position -= 20
+        c.drawString(30, y_position, "Decision Tree Parameters:")
+        y_position -= 15
+        for param, value in params_dt['params'].items():
+            c.drawString(30, y_position, f"{param}: {value}")
+            y_position -= 15
+        
+        # Data
+        y_position -= 20
+        c.drawString(30, y_position, "Data:")
+        y_position -= 15
+        c.drawString(30, y_position, f"Train size: {X_train.shape}")
+        y_position -= 15
+        c.drawString(30, y_position, f"Test size: {X_test.shape}")
+        y_position -= 15
+        c.drawString(30, y_position, f"Train labels size: {y_train.shape}")
+        y_position -= 15
+        c.drawString(30, y_position, f"Test labels size: {y_test.shape}")
 
         c.save()
         return pdf_path
@@ -135,9 +166,9 @@ if uploaded_file is not None:
 
     missing_values_count = df.isnull().sum().sum()
     if missing_values_count > 0:
-        st.markdown(f"<span style='color:red'>{missing_values_count} missing value ditemukkan❗</span><br><span>Pogram ini sudah dilengkapi dengan penanganan Missing Value, silahkan melanjutkan proses!</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='color:red'>{missing_values_count} missing value ditemukkan❗</span><br><span>Program ini sudah dilengkapi dengan penanganan Missing Value, silahkan melanjutkan proses!</span>", unsafe_allow_html=True)
     else:
-         st.markdown(f"<span style='color:#00d26a'>Tidak ada missing value dalam dataset✅</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='color:#00d26a'>Tidak ada missing value dalam dataset✅</span>", unsafe_allow_html=True)
 
     all_columns = df.columns.tolist()
 
@@ -145,6 +176,14 @@ if uploaded_file is not None:
 
     selected_features = st.multiselect('Select Features', all_columns)
     selected_label = st.selectbox('Select Label', all_columns)
+
+    with st.expander("Data Split"):
+        train_size = st.number_input('Train Size', min_value=0.1, max_value=0.9, value=0.8, step=0.1)
+        test_size = st.number_input('Test Size', min_value=0.1, max_value=0.9, value=0.2, step=0.1)
+
+        # Ensure the sum of train_size and test_size is 1.0
+        if train_size + test_size != 1.0:
+            st.error("The sum of Train Size and Test Size must be 1.0")
 
     col1, col2 = st.columns(2)
 
@@ -164,9 +203,9 @@ if uploaded_file is not None:
             params_dt = {'model': 'DecisionTree', 'params': {'criterion': criterion, 'max_depth': max_depth, 'min_samples_leaf': min_samples_leaf, 'min_samples_split': min_samples_split}}
 
     if st.button('Compare Models'):
-        if selected_features and selected_label:
-            results_knn = train_and_evaluate(df, selected_features, selected_label, params_knn)
-            results_dt = train_and_evaluate(df, selected_features, selected_label, params_dt)
+        if selected_features and selected_label and train_size + test_size == 1.0:
+            results_knn, X_train, X_test, y_train, y_test = train_and_evaluate(df, selected_features, selected_label, params_knn, test_size)
+            results_dt, _, _, _, _ = train_and_evaluate(df, selected_features, selected_label, params_dt, test_size)
 
             st.write('KNN Results:', results_knn)
             st.write('Decision Tree Results:', results_dt)
@@ -181,7 +220,7 @@ if uploaded_file is not None:
 
             plot_comparison(results_knn, results_dt)
 
-            pdf_path = generate_pdf(results_knn, results_dt)
+            pdf_path = generate_pdf(results_knn, results_dt, params_knn, params_dt, X_train, X_test, y_train, y_test)
             with open(pdf_path, "rb") as file:
                 st.download_button(
                     label="Download comparison as PDF",
@@ -190,7 +229,7 @@ if uploaded_file is not None:
                     mime="application/octet-stream"
                 )
         else:
-            st.error("Please select features and label.")
+            st.error("Please select features, label, and ensure the sum of Train Size and Test Size is 1.0.")
 
 st.write('---')
 st.markdown('<div style="width: auto; margin: 0 auto; text-align: center;">'
