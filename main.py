@@ -113,13 +113,9 @@ def generate_pdf(results_knn, results_dt, params_knn, params_dt, X_train, X_test
         y_position -= 20
         c.drawString(30, y_position, "Data:")
         y_position -= 15
-        c.drawString(30, y_position, f"Train size: {X_train.shape}")
+        c.drawString(30, y_position, f"Train size: {train_size}")
         y_position -= 15
-        c.drawString(30, y_position, f"Test size: {X_test.shape}")
-        y_position -= 15
-        c.drawString(30, y_position, f"Train labels size: {y_train.shape}")
-        y_position -= 15
-        c.drawString(30, y_position, f"Test labels size: {y_test.shape}")
+        c.drawString(30, y_position, f"Test size: {test_size}")
 
         c.save()
         return pdf_path
